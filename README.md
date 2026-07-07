@@ -4,8 +4,8 @@ An AI-powered full-stack web application that turns a user topic into a structur
 
 ## Live Demo
 
-- Frontend: https://ai-course-generator-flame.vercel.app
-- Backend: https://ai-course-generator-m9bh.onrender.com
+- Frontend: https://ai-course-generator-tan.vercel.app/
+- Backend: https://ai-course-generator-si9d.onrender.com
 
 ## Tech Stack
 
