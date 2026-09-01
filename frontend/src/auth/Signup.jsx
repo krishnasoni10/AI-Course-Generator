@@ -7,6 +7,8 @@ import { apiFetch } from "@/lib/api";
 import ThemeToggle from "@/_components/ThemeToggle";
 import robot from "../assets/robot.png";
 import { ArrowRight, Eye, EyeOff, Lock, Mail, Sparkles, User } from "lucide-react";
+import { useAuth } from "../_context/AuthContext";
+import { GoogleLogin } from "@react-oauth/google";
 
 const Signup = () => {
   const [signupInfo, setSignupInfo] = useState({
@@ -15,6 +17,7 @@ const Signup = () => {
     password: "",
   });
   const [showPassword, setShowPassword] = useState(false);
+  const { login } = useAuth();
 
   const navigate = useNavigate();
 
@@ -138,6 +141,38 @@ const Signup = () => {
               <ArrowRight className="h-5 w-5" />
             </Button>
           </form>
+
+          <div className="mt-6 flex items-center gap-4">
+            <div className="h-px flex-1 bg-slate-200 dark:bg-white/10"></div>
+            <span className="text-sm font-semibold text-slate-400">OR</span>
+            <div className="h-px flex-1 bg-slate-200 dark:bg-white/10"></div>
+          </div>
+
+          <div className="mt-6 flex justify-center">
+            <GoogleLogin
+              onSuccess={async (credentialResponse) => {
+                try {
+                  const result = await apiFetch("/auth/google", {
+                    method: "POST",
+                    body: JSON.stringify({ credential: credentialResponse.credential }),
+                  });
+                  if (result.success) {
+                    handleSuccess("Google Signup successful");
+                    login(result.jwtToken, result.name, result.email);
+                    setTimeout(() => navigate("/dashboard"), 800);
+                  } else {
+                    handleError(result.message || "Google Signup failed");
+                  }
+                } catch (err) {
+                  handleError(err.message || "Something went wrong");
+                }
+              }}
+              onError={() => {
+                handleError("Google Signup Failed");
+              }}
+              useOneTap
+            />
+          </div>
 
           <p className="mt-6 text-center text-sm text-slate-600 dark:text-slate-300">
             Already have an account?{" "}

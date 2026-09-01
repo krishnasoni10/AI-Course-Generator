@@ -7,6 +7,8 @@ import { apiFetch } from "@/lib/api";
 import ThemeToggle from "@/_components/ThemeToggle";
 import robot from "../assets/robot.png";
 import { ArrowRight, Eye, EyeOff, Lock, Mail, Sparkles } from "lucide-react";
+import { useAuth } from "../_context/AuthContext";
+import { GoogleLogin } from "@react-oauth/google";
 
 const Login = () => {
   const [loginInfo, setLoginInfo] = useState({
@@ -14,6 +16,7 @@ const Login = () => {
     password: "",
   });
   const [showPassword, setShowPassword] = useState(false);
+  const { login } = useAuth();
 
   const navigate = useNavigate();
 
@@ -38,9 +41,7 @@ const Login = () => {
 
       if (success) {
         handleSuccess(message);
-        if (result.jwtToken) localStorage.setItem("token", result.jwtToken);
-        if (result.name) localStorage.setItem("userName", result.name);
-        if (result.email) localStorage.setItem("email", result.email);
+        login(result.jwtToken, result.name, result.email);
         setTimeout(() => navigate("/dashboard"), 800);
       } else {
         handleError(message || "Login failed");
@@ -144,6 +145,38 @@ const Login = () => {
               <ArrowRight className="h-5 w-5" />
             </Button>
           </form>
+
+          <div className="mt-6 flex items-center gap-4">
+            <div className="h-px flex-1 bg-slate-200 dark:bg-white/10"></div>
+            <span className="text-sm font-semibold text-slate-400">OR</span>
+            <div className="h-px flex-1 bg-slate-200 dark:bg-white/10"></div>
+          </div>
+
+          <div className="mt-6 flex justify-center">
+            <GoogleLogin
+              onSuccess={async (credentialResponse) => {
+                try {
+                  const result = await apiFetch("/auth/google", {
+                    method: "POST",
+                    body: JSON.stringify({ credential: credentialResponse.credential }),
+                  });
+                  if (result.success) {
+                    handleSuccess("Google Login successful");
+                    login(result.jwtToken, result.name, result.email);
+                    setTimeout(() => navigate("/dashboard"), 800);
+                  } else {
+                    handleError(result.message || "Google Login failed");
+                  }
+                } catch (err) {
+                  handleError(err.message || "Something went wrong");
+                }
+              }}
+              onError={() => {
+                handleError("Google Login Failed");
+              }}
+              useOneTap
+            />
+          </div>
 
           <p className="mt-6 text-center text-sm text-slate-600 dark:text-slate-300">
             Don't have an account?{" "}

@@ -17,8 +17,16 @@ const UserSchema = new Schema({
   },
   password: {
     type: String,
-    required: true,
+    required: false, // Optional for Google OAuth users
     minlength: 4
+  },
+  googleId: {
+    type: String,
+    unique: true,
+    sparse: true,
+  },
+  picture: {
+    type: String,
   },
   role: {
     type: String,
