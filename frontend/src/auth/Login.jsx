@@ -16,6 +16,7 @@ const Login = () => {
     password: "",
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
 
   const navigate = useNavigate();
@@ -32,6 +33,7 @@ const Login = () => {
       return handleError("Email and password are required");
     }
 
+    setIsLoading(true);
     try {
       const result = await apiFetch("/auth/login", {
         method: "POST",
@@ -48,6 +50,8 @@ const Login = () => {
       }
     } catch (err) {
       handleError(err.message || "Something went wrong");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -139,10 +143,11 @@ const Login = () => {
 
             <Button
               type="submit"
-              className="mt-2 h-12 w-full rounded-xl bg-blue-600 text-base font-bold text-white hover:bg-blue-700"
+              disabled={isLoading}
+              className="mt-2 h-12 w-full rounded-xl bg-blue-600 text-base font-bold text-white hover:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              Log In
-              <ArrowRight className="h-5 w-5" />
+              {isLoading ? "Logging in..." : "Log In"}
+              {!isLoading && <ArrowRight className="h-5 w-5" />}
             </Button>
           </form>
 
