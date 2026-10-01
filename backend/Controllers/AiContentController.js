@@ -167,7 +167,7 @@ const CHAPTER_CONTENT_SCHEMA = {
 
 const genAI_Content = new GoogleGenerativeAI(apiKeyContent);
 const contentModel = genAI_Content.getGenerativeModel({
-  model: configuredModel || "gemini-1.5-flash",
+  model: configuredModel || "gemini-3.8-flash",
 
   generationConfig: {
     responseMimeType: "application/json",

@@ -47,7 +47,6 @@ const COURSE_LAYOUT_SCHEMA = {
 
 const MODEL_FALLBACKS = [
   configuredModel,
-  "gemini-1.5-flash",
   "gemini-3.8-flash",
 ].filter(Boolean);
 
