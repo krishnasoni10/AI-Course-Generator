@@ -1,9 +1,9 @@
 const {
-  GoogleGenerativeAI,
+  GoogleGenAI,
   HarmCategory,
   HarmBlockThreshold,
-  SchemaType,
-} = require("@google/generative-ai");
+  Type,
+} = require("@google/genai");
 
 const apiKeyContent = process.env.NODE_GEMINI_API_KEY_2;
 const configuredModel = process.env.GEMINI_MODEL;
@@ -115,48 +115,48 @@ const normalizeChapterContent = (value) => {
 };
 
 const CHAPTER_CONTENT_SCHEMA = {
-  type: SchemaType.ARRAY,
+  type: Type.ARRAY,
   items: {
-    type: SchemaType.OBJECT,
+    type: Type.OBJECT,
     properties: {
-      title: { type: SchemaType.STRING },
-      description: { type: SchemaType.STRING },
+      title: { type: Type.STRING },
+      description: { type: Type.STRING },
 
       codeExample: {
-        type: SchemaType.STRING,
+        type: Type.STRING,
         description:
           "Optional code snippet. Must be formatted as a string containing HTML <pre><code>...</code></pre> tags. Can be an empty string if not applicable.",
       },
       objectives: {
-        type: SchemaType.ARRAY,
-        items: { type: SchemaType.STRING },
+        type: Type.ARRAY,
+        items: { type: Type.STRING },
       },
       keyTopics: {
-        type: SchemaType.ARRAY,
-        items: { type: SchemaType.STRING },
+        type: Type.ARRAY,
+        items: { type: Type.STRING },
       },
       readings: {
-        type: SchemaType.ARRAY,
+        type: Type.ARRAY,
         items: {
-          type: SchemaType.OBJECT,
+          type: Type.OBJECT,
           properties: {
-            title: { type: SchemaType.STRING },
-            url: { type: SchemaType.STRING },
+            title: { type: Type.STRING },
+            url: { type: Type.STRING },
           },
         },
       },
       quiz: {
-        type: SchemaType.ARRAY,
+        type: Type.ARRAY,
         items: {
-          type: SchemaType.OBJECT,
+          type: Type.OBJECT,
           properties: {
-            question: { type: SchemaType.STRING },
+            question: { type: Type.STRING },
             options: {
-              type: SchemaType.ARRAY,
-              items: { type: SchemaType.STRING },
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
             },
-            answer: { type: SchemaType.STRING },
-            explanation: { type: SchemaType.STRING },
+            answer: { type: Type.STRING },
+            explanation: { type: Type.STRING },
           },
         },
       },
@@ -169,8 +169,8 @@ const apiKeyFallback = process.env.NODE_GEMINI_API_KEY;
 const fallbackModelName = process.env.GEMINI_FALLBACK_MODEL;
 
 const CONTENT_MODEL_FALLBACKS = [
-  configuredModel || "gemini-2.0-flash",
-  "gemini-2.0-flash",
+  configuredModel || "gemini-3.8-flash",
+  "gemini-3.8-flash",
   fallbackModelName,
 ].filter((v, i, a) => v && a.indexOf(v) === i); // deduplicate
 
@@ -200,9 +200,9 @@ const contentSafetySettings = [
   },
 ];
 
-const genAI_Content = new GoogleGenerativeAI(apiKeyContent);
+const genAI_Content = apiKeyContent ? new GoogleGenAI({ apiKey: apiKeyContent }) : null;
 const genAI_Fallback = apiKeyFallback
-  ? new GoogleGenerativeAI(apiKeyFallback)
+  ? new GoogleGenAI({ apiKey: apiKeyFallback })
   : genAI_Content;
 
 /**
@@ -241,10 +241,14 @@ const isTransientError = (error) => {
  * Only transient errors (503, 429, network) trigger a retry.
  * Permanent errors (401, 403, 404) are thrown immediately.
  */
-async function generateWithRetry(model, prompt, maxRetries = 3) {
+async function generateWithRetry(ai, modelName, prompt, maxRetries = 3) {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await model.generateContent(prompt);
+      return await ai.models.generateContent({
+        model: modelName,
+        contents: prompt,
+        config: { ...contentGenerationConfig, safetySettings: contentSafetySettings },
+      });
     } catch (error) {
       if (!isTransientError(error) || attempt === maxRetries) {
         throw error;
@@ -276,13 +280,7 @@ async function generateContentWithFallback(prompt) {
     try {
       console.log(`[Content] Attempting generation with model: ${modelName}`);
 
-      const model = genAIInstance.getGenerativeModel({
-        model: modelName,
-        generationConfig: contentGenerationConfig,
-        safetySettings: contentSafetySettings,
-      });
-
-      const result = await generateWithRetry(model, prompt, 3);
+      const result = await generateWithRetry(genAIInstance, modelName, prompt, 3);
       console.log(`[Content] Successfully generated with model: ${modelName}`);
       return result;
     } catch (error) {
@@ -322,9 +320,8 @@ async function generateChapterContent(req, res) {
       });
     }
 
-    const result = await generateWithRetry(message);
-    const response = result.response;
-    const aiResponseText = response.text();
+    const result = await generateContentWithFallback(message);
+    const aiResponseText = result.text;
 
     let parsed;
     try {

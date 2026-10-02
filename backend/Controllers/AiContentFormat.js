@@ -1,9 +1,9 @@
 const {
-  GoogleGenerativeAI,
+  GoogleGenAI,
   HarmCategory,
   HarmBlockThreshold,
-  SchemaType,
-} = require("@google/generative-ai");
+  Type,
+} = require("@google/genai");
 
 const apiKey = process.env.NODE_GEMINI_API_KEY;
 const configuredModel = process.env.GEMINI_MODEL;
@@ -17,23 +17,23 @@ const hasLikelyGeminiApiKey = (key) =>
   (key.trim().startsWith("AIza") || key.trim().startsWith("AQ."));
 
 const COURSE_LAYOUT_SCHEMA = {
-  type: SchemaType.OBJECT,
+  type: Type.OBJECT,
   properties: {
-    courseName: { type: SchemaType.STRING },
-    description: { type: SchemaType.STRING },
-    category: { type: SchemaType.STRING },
-    topic: { type: SchemaType.STRING },
-    level: { type: SchemaType.STRING },
-    totalDurationSpecific: { type: SchemaType.STRING },
-    totalDurationSummary: { type: SchemaType.STRING },
+    courseName: { type: Type.STRING },
+    description: { type: Type.STRING },
+    category: { type: Type.STRING },
+    topic: { type: Type.STRING },
+    level: { type: Type.STRING },
+    totalDurationSpecific: { type: Type.STRING },
+    totalDurationSummary: { type: Type.STRING },
     chapters: {
-      type: SchemaType.ARRAY,
+      type: Type.ARRAY,
       items: {
-        type: SchemaType.OBJECT,
+        type: Type.OBJECT,
         properties: {
-          chapterName: { type: SchemaType.STRING },
-          about: { type: SchemaType.STRING },
-          duration: { type: SchemaType.STRING },
+          chapterName: { type: Type.STRING },
+          about: { type: Type.STRING },
+          duration: { type: Type.STRING },
         },
         required: ["chapterName", "about", "duration"],
       },
@@ -49,7 +49,7 @@ const fallbackModel = process.env.GEMINI_FALLBACK_MODEL;
 
 const MODEL_FALLBACKS = [
   configuredModel,
-  "gemini-2.0-flash",
+  "gemini-3.8-flash",
   fallbackModel,
 ].filter((v, i, a) => v && a.indexOf(v) === i); // deduplicate
 
@@ -103,10 +103,14 @@ const isTransientError = (error) => {
  * Only transient errors (503, 429, network) trigger a retry.
  * Permanent errors (401, 403, 404) are thrown immediately.
  */
-async function generateWithRetry(model, prompt, maxRetries = 3) {
+async function generateWithRetry(modelName, prompt, maxRetries = 3) {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await model.generateContent(prompt);
+      return await genAI.models.generateContent({
+        model: modelName,
+        contents: prompt,
+        config: { ...generationConfig, safetySettings },
+      });
     } catch (error) {
       if (!isTransientError(error) || attempt === maxRetries) {
         throw error;
@@ -162,16 +166,16 @@ const validateLayout = (layout) => {
   };
 };
 
-const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
+const genAI = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 /**
  * Tries each model in MODEL_FALLBACKS with exponential backoff retry.
  *
- *   Primary model (e.g. gemini-2.0-flash)
+ *   Primary model (from GEMINI_MODEL or gemini-3.8-flash)
  *       ↓ retry up to 3 times with backoff
  *   Still failing?
  *       ↓
- *   Fallback model (e.g. gemini-2.0-flash-lite)
+ *   Fallback model (from GEMINI_FALLBACK_MODEL)
  *       ↓ retry up to 3 times with backoff
  *   Still failing?
  *       ↓ throw last error
@@ -183,14 +187,8 @@ async function generateWithModelFallback(message) {
     try {
       console.log(`[Layout] Attempting generation with model: ${modelName}`);
 
-      const model = genAI.getGenerativeModel({
-        model: modelName,
-        generationConfig,
-        safetySettings,
-      });
-
-      const result = await generateWithRetry(model, message, 3);
-      const text = result.response.text();
+      const result = await generateWithRetry(modelName, message, 3);
+      const text = result.text;
       const layout = validateLayout(extractJson(text));
 
       console.log(`[Layout] Successfully generated with model: ${modelName}`);
