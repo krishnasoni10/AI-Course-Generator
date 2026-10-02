@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import ChapterListCard from "./_components/ChapterListCard";
 import ChapterContent from "./_components/ChapterContent";
 import { BrainCircuit, Menu } from "lucide-react";
@@ -7,6 +7,7 @@ import { apiFetch } from "@/lib/api";
 
 function CourseStart() {
   const { courseId } = useParams();
+  const navigate = useNavigate();
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedChapter, setSelectedChapter] = useState(null);
@@ -151,6 +152,7 @@ function CourseStart() {
             )}
             completedSections={completedSections}
             onToggleSectionDone={toggleSectionDone}
+            onOpenCourseLayout={() => navigate(`/create-course/${courseId}`)}
           />
         ) : (
           <p className="text-slate-700 dark:text-slate-200">

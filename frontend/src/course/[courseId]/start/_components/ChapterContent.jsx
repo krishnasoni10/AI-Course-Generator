@@ -14,6 +14,7 @@ function ChapterContent({
   chapterIndex = 0,
   completedSections = {},
   onToggleSectionDone,
+  onOpenCourseLayout,
 }) {
   const [loading, setLoading] = useState(false);
   const [selectedAnswers, setSelectedAnswers] = useState({});
@@ -237,9 +238,16 @@ function ChapterContent({
             This chapter is waiting for content.
           </h3>
           <p className="mx-auto mt-2 max-w-xl text-sm text-slate-500 dark:text-slate-400">
-            Go back to the course layout and click Generate Lessons. If YouTube
-            is unavailable, the app will still save AI notes and quizzes.
+            Generate lessons from the course layout. If YouTube is unavailable,
+            the app can still save AI notes and quizzes.
           </p>
+          <button
+            type="button"
+            onClick={onOpenCourseLayout}
+            className="mt-5 inline-flex items-center justify-center rounded-lg bg-teal-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-teal-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-500"
+          >
+            Open course layout
+          </button>
         </div>
       )}
 
