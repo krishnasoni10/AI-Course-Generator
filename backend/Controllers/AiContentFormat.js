@@ -51,7 +51,9 @@ const MODEL_FALLBACKS = [
   configuredModel,
   "gemini-3.8-flash",
   fallbackModel,
-].filter((v, i, a) => v && a.indexOf(v) === i); // deduplicate
+].filter((model, index, models) =>
+  model && model !== "gemini-2.0-flash" && models.indexOf(model) === index,
+);
 
 const generationConfig = {
   responseMimeType: "application/json",
