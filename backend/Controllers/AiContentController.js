@@ -105,9 +105,9 @@ const normalizeChapterContent = (value) => {
       ),
       readings: Array.isArray(block.readings || block.suggestedReadings)
         ? (block.readings || block.suggestedReadings).slice(0, 3).map((reading) => ({
-            title: sanitizeGeneratedText(reading?.title || reading, 80),
-            url: sanitizeGeneratedText(reading?.url, 220),
-          }))
+          title: sanitizeGeneratedText(reading?.title || reading, 80),
+          url: sanitizeGeneratedText(reading?.url, 220),
+        }))
         : [],
       quiz,
     };
@@ -165,44 +165,135 @@ const CHAPTER_CONTENT_SCHEMA = {
   },
 };
 
-const genAI_Content = new GoogleGenerativeAI(apiKeyContent);
-const contentModel = genAI_Content.getGenerativeModel({
-  model: configuredModel || "gemini-3.8-flash",
+const apiKeyFallback = process.env.NODE_GEMINI_API_KEY;
+const fallbackModelName = process.env.GEMINI_FALLBACK_MODEL;
 
-  generationConfig: {
-    responseMimeType: "application/json",
-    responseSchema: CHAPTER_CONTENT_SCHEMA,
-    temperature: 0.6,
-    maxOutputTokens: 1800,
+const CONTENT_MODEL_FALLBACKS = [
+  configuredModel || "gemini-2.0-flash",
+  "gemini-2.0-flash",
+  fallbackModelName,
+].filter((v, i, a) => v && a.indexOf(v) === i); // deduplicate
+
+const contentGenerationConfig = {
+  responseMimeType: "application/json",
+  responseSchema: CHAPTER_CONTENT_SCHEMA,
+  temperature: 0.6,
+  maxOutputTokens: 1800,
+};
+
+const contentSafetySettings = [
+  {
+    category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+    threshold: HarmBlockThreshold.BLOCK_NONE,
   },
+  {
+    category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+    threshold: HarmBlockThreshold.BLOCK_NONE,
+  },
+  {
+    category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+    threshold: HarmBlockThreshold.BLOCK_NONE,
+  },
+  {
+    category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+    threshold: HarmBlockThreshold.BLOCK_NONE,
+  },
+];
 
-  safetySettings: [
-    {
-      category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-      threshold: HarmBlockThreshold.BLOCK_NONE,
-    },
-    {
-      category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-      threshold: HarmBlockThreshold.BLOCK_NONE,
-    },
-    {
-      category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-      threshold: HarmBlockThreshold.BLOCK_NONE,
-    },
-    {
-      category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-      threshold: HarmBlockThreshold.BLOCK_NONE,
-    },
-  ],
-});
-async function generateWithRetry(prompt, retries = 2, delay = 1500) {
-  try {
-    return await contentModel.generateContent(prompt);
-  } catch (err) {
-    if (retries === 0) throw err;
-    await new Promise((res) => setTimeout(res, delay));
-    return generateWithRetry(prompt, retries - 1, delay * 1.5);
+const genAI_Content = new GoogleGenerativeAI(apiKeyContent);
+const genAI_Fallback = apiKeyFallback
+  ? new GoogleGenerativeAI(apiKeyFallback)
+  : genAI_Content;
+
+/**
+ * Determines whether an error is transient (worth retrying).
+ * Covers 503 (service unavailable), 429 (rate limit), and generic
+ * network/timeout errors that Google's API can throw.
+ */
+const isTransientError = (error) => {
+  const msg = (error?.message || "").toLowerCase();
+  const status = error?.status || error?.httpStatusCode || 0;
+
+  return (
+    status === 503 ||
+    status === 429 ||
+    msg.includes("503") ||
+    msg.includes("429") ||
+    msg.includes("service unavailable") ||
+    msg.includes("unavailable") ||
+    msg.includes("overloaded") ||
+    msg.includes("resource exhausted") ||
+    msg.includes("deadline exceeded") ||
+    msg.includes("econnreset") ||
+    msg.includes("socket hang up") ||
+    msg.includes("etimedout")
+  );
+};
+
+/**
+ * Calls model.generateContent with exponential backoff retry.
+ *
+ *   Attempt 0  →  fail  →  wait 2 s
+ *   Attempt 1  →  fail  →  wait 4 s
+ *   Attempt 2  →  fail  →  wait 8 s
+ *   Attempt 3  →  fail  →  throw
+ *
+ * Only transient errors (503, 429, network) trigger a retry.
+ * Permanent errors (401, 403, 404) are thrown immediately.
+ */
+async function generateWithRetry(model, prompt, maxRetries = 3) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await model.generateContent(prompt);
+    } catch (error) {
+      if (!isTransientError(error) || attempt === maxRetries) {
+        throw error;
+      }
+
+      const delay = 2000 * Math.pow(2, attempt);
+      console.log(
+        `[Content] Gemini transient error (attempt ${attempt + 1}/${maxRetries + 1}). ` +
+        `Retrying in ${delay}ms... (${error.message})`
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
   }
+}
+
+/**
+ * Tries each model in CONTENT_MODEL_FALLBACKS with exponential backoff.
+ * Uses the primary API key first, then falls back to the secondary key.
+ */
+async function generateContentWithFallback(prompt) {
+  let lastError;
+  const genAIInstances = [genAI_Content, genAI_Fallback];
+
+  for (let i = 0; i < CONTENT_MODEL_FALLBACKS.length; i++) {
+    const modelName = CONTENT_MODEL_FALLBACKS[i];
+    // Use primary key for first model, fallback key for subsequent
+    const genAIInstance = i === 0 ? genAIInstances[0] : genAIInstances[1];
+
+    try {
+      console.log(`[Content] Attempting generation with model: ${modelName}`);
+
+      const model = genAIInstance.getGenerativeModel({
+        model: modelName,
+        generationConfig: contentGenerationConfig,
+        safetySettings: contentSafetySettings,
+      });
+
+      const result = await generateWithRetry(model, prompt, 3);
+      console.log(`[Content] Successfully generated with model: ${modelName}`);
+      return result;
+    } catch (error) {
+      lastError = error;
+      console.error(
+        `[Content] All attempts failed for model ${modelName}: ${error.message}`
+      );
+    }
+  }
+
+  throw lastError || new Error("No Gemini model was available for content generation.");
 }
 
 async function generateChapterContent(req, res) {

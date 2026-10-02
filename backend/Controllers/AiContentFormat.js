@@ -45,10 +45,13 @@ const COURSE_LAYOUT_SCHEMA = {
   ],
 };
 
+const fallbackModel = process.env.GEMINI_FALLBACK_MODEL;
+
 const MODEL_FALLBACKS = [
   configuredModel,
-  "gemini-3.8-flash",
-].filter(Boolean);
+  "gemini-2.0-flash",
+  fallbackModel,
+].filter((v, i, a) => v && a.indexOf(v) === i); // deduplicate
 
 const generationConfig = {
   responseMimeType: "application/json",
@@ -63,6 +66,61 @@ const safetySettings = [
   { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
   { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
 ];
+
+/**
+ * Determines whether an error is transient (worth retrying).
+ * Covers 503 (service unavailable), 429 (rate limit), and generic
+ * network/timeout errors that Google's API can throw.
+ */
+const isTransientError = (error) => {
+  const msg = (error?.message || "").toLowerCase();
+  const status = error?.status || error?.httpStatusCode || 0;
+
+  return (
+    status === 503 ||
+    status === 429 ||
+    msg.includes("503") ||
+    msg.includes("429") ||
+    msg.includes("service unavailable") ||
+    msg.includes("unavailable") ||
+    msg.includes("overloaded") ||
+    msg.includes("resource exhausted") ||
+    msg.includes("deadline exceeded") ||
+    msg.includes("econnreset") ||
+    msg.includes("socket hang up") ||
+    msg.includes("etimedout")
+  );
+};
+
+/**
+ * Calls model.generateContent with exponential backoff retry.
+ *
+ *   Attempt 0  →  fail  →  wait 2 s
+ *   Attempt 1  →  fail  →  wait 4 s
+ *   Attempt 2  →  fail  →  wait 8 s
+ *   Attempt 3  →  fail  →  throw
+ *
+ * Only transient errors (503, 429, network) trigger a retry.
+ * Permanent errors (401, 403, 404) are thrown immediately.
+ */
+async function generateWithRetry(model, prompt, maxRetries = 3) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await model.generateContent(prompt);
+    } catch (error) {
+      if (!isTransientError(error) || attempt === maxRetries) {
+        throw error;
+      }
+
+      const delay = 2000 * Math.pow(2, attempt);
+      console.log(
+        `[Layout] Gemini transient error (attempt ${attempt + 1}/${maxRetries + 1}). ` +
+        `Retrying in ${delay}ms... (${error.message})`
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+}
 
 const extractJson = (text) => {
   const cleaned = text
@@ -106,23 +164,42 @@ const validateLayout = (layout) => {
 
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
+/**
+ * Tries each model in MODEL_FALLBACKS with exponential backoff retry.
+ *
+ *   Primary model (e.g. gemini-2.0-flash)
+ *       ↓ retry up to 3 times with backoff
+ *   Still failing?
+ *       ↓
+ *   Fallback model (e.g. gemini-2.0-flash-lite)
+ *       ↓ retry up to 3 times with backoff
+ *   Still failing?
+ *       ↓ throw last error
+ */
 async function generateWithModelFallback(message) {
   let lastError;
 
   for (const modelName of MODEL_FALLBACKS) {
     try {
+      console.log(`[Layout] Attempting generation with model: ${modelName}`);
+
       const model = genAI.getGenerativeModel({
         model: modelName,
         generationConfig,
         safetySettings,
       });
 
-      const result = await model.generateContent(message);
+      const result = await generateWithRetry(model, message, 3);
       const text = result.response.text();
-      return validateLayout(extractJson(text));
+      const layout = validateLayout(extractJson(text));
+
+      console.log(`[Layout] Successfully generated with model: ${modelName}`);
+      return layout;
     } catch (error) {
       lastError = error;
-      console.error(`Course layout generation failed with ${modelName}:`, error.message);
+      console.error(
+        `[Layout] All attempts failed for model ${modelName}: ${error.message}`
+      );
     }
   }
 
@@ -146,7 +223,7 @@ async function generateCourseLayout(req, res) {
   }
 
   try {
-    const { message } = req.body; 
+    const { message } = req.body;
 
     if (!message) {
       return res.status(400).json({
@@ -154,7 +231,7 @@ async function generateCourseLayout(req, res) {
         message: "Please provide a valid 'message' in request body.",
       });
     }
-    
+
     const parsed = await generateWithModelFallback(message);
 
     res.status(200).json({
