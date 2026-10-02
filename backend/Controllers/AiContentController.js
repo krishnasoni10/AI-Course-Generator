@@ -5,11 +5,12 @@ const {
   Type,
 } = require("@google/genai");
 
-const apiKeyContent = process.env.NODE_GEMINI_API_KEY_2;
+const apiKeyContent =
+  process.env.NODE_GEMINI_API_KEY_2 || process.env.NODE_GEMINI_API_KEY;
 const configuredModel = process.env.GEMINI_MODEL;
 
 if (!apiKeyContent) {
-  console.error("CRITICAL: NODE_GEMINI_API_KEY_2 is not set in .env file.");
+  console.error("CRITICAL: No Gemini API key is configured for chapter content.");
 }
 
 const hasLikelyGeminiApiKey = (key) =>
@@ -354,6 +355,7 @@ async function generateChapterContent(req, res) {
     return res.status(500).json({
       success: false,
       message: "Failed to generate chapter content.",
+      error: error.message,
     });
   }
 }

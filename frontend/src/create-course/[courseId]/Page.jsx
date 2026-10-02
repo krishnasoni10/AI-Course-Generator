@@ -118,10 +118,13 @@ Rules:
           videos: videoData.success ? videoData.data : [],
         };
 
-        await apiFetch("/course/save-chapter-content", {
+        const saveData = await apiFetch("/course/save-chapter-content", {
           method: "POST",
           body: JSON.stringify(savePayload),
         });
+        if (!saveData.success) {
+          throw new Error(saveData.message || "Failed to save chapter content.");
+        }
 
         return { videoWarning };
       }
@@ -291,17 +294,32 @@ Rules:
             )}
             {generationProgress.failed.length > 0 && (
               <p className="mt-2 text-red-600 dark:text-red-300">
-                Warnings: {generationProgress.failed.length}. Missing videos can
-                be retried later; notes are still saved.
+                Warnings: {generationProgress.failed.length}. Details will remain
+                visible below when generation finishes.
               </p>
             )}
           </div>
         )}
 
         {!isChapterLoading && generationProgress.completed > 0 && (
-          <div className="my-8 flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 p-4 text-sm font-medium text-green-800 dark:border-green-400/20 dark:bg-green-400/10 dark:text-green-200">
-            <CheckCircle2 className="h-5 w-5" />
-            Content generation finished. Open Start to study the course.
+          <div className={`my-8 rounded-xl border p-4 text-sm ${
+            generationProgress.failed.length > 0
+              ? "border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-100"
+              : "border-green-200 bg-green-50 font-medium text-green-800 dark:border-green-400/20 dark:bg-green-400/10 dark:text-green-200"
+          }`}>
+            <p className="flex items-center gap-2 font-semibold">
+              {generationProgress.failed.length === 0 && <CheckCircle2 className="h-5 w-5" />}
+              {generationProgress.failed.length > 0
+                ? `Generation finished with ${generationProgress.failed.length} warning(s).`
+                : "Content generation finished. Open Start to study the course."}
+            </p>
+            {generationProgress.failed.length > 0 && (
+              <ul className="mt-3 list-disc space-y-1 pl-5">
+                {generationProgress.failed.map((warning, index) => (
+                  <li key={`${index}-${warning}`}>{warning}</li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
       </div>
