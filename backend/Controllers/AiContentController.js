@@ -204,7 +204,7 @@ const contentSafetySettings = [
 ];
 
 const genAI_Content = apiKeyContent ? new GoogleGenAI({ apiKey: apiKeyContent }) : null;
-const genAI_Fallback = apiKeyFallback
+const genAI_Fallback = apiKeyFallback && apiKeyFallback !== apiKeyContent
   ? new GoogleGenAI({ apiKey: apiKeyFallback })
   : genAI_Content;
 
@@ -233,6 +233,11 @@ const isTransientError = (error) => {
   );
 };
 
+const isExhaustedQuotaError = (error) => {
+  const msg = (error?.message || "").toLowerCase();
+  return msg.includes("quota exceeded") || msg.includes("free_tier_requests");
+};
+
 /**
  * Calls model.generateContent with exponential backoff retry.
  *
@@ -253,7 +258,11 @@ async function generateWithRetry(ai, modelName, prompt, maxRetries = 3) {
         config: { ...contentGenerationConfig, safetySettings: contentSafetySettings },
       });
     } catch (error) {
-      if (!isTransientError(error) || attempt === maxRetries) {
+      if (
+        isExhaustedQuotaError(error) ||
+        !isTransientError(error) ||
+        attempt === maxRetries
+      ) {
         throw error;
       }
 
@@ -273,24 +282,28 @@ async function generateWithRetry(ai, modelName, prompt, maxRetries = 3) {
  */
 async function generateContentWithFallback(prompt) {
   let lastError;
-  const genAIInstances = [genAI_Content, genAI_Fallback];
+  const genAIInstances = [genAI_Content, genAI_Fallback].filter(
+    (instance, index, instances) => instance && instances.indexOf(instance) === index,
+  );
 
-  for (let i = 0; i < CONTENT_MODEL_FALLBACKS.length; i++) {
-    const modelName = CONTENT_MODEL_FALLBACKS[i];
-    // Use primary key for first model, fallback key for subsequent
-    const genAIInstance = i === 0 ? genAIInstances[0] : genAIInstances[1];
+  for (const modelName of CONTENT_MODEL_FALLBACKS) {
+    for (let keyIndex = 0; keyIndex < genAIInstances.length; keyIndex++) {
+      const genAIInstance = genAIInstances[keyIndex];
 
-    try {
-      console.log(`[Content] Attempting generation with model: ${modelName}`);
+      try {
+        console.log(
+          `[Content] Attempting model ${modelName} with API key ${keyIndex + 1}/${genAIInstances.length}`,
+        );
 
-      const result = await generateWithRetry(genAIInstance, modelName, prompt, 3);
-      console.log(`[Content] Successfully generated with model: ${modelName}`);
-      return result;
-    } catch (error) {
-      lastError = error;
-      console.error(
-        `[Content] All attempts failed for model ${modelName}: ${error.message}`
-      );
+        const result = await generateWithRetry(genAIInstance, modelName, prompt, 3);
+        console.log(`[Content] Successfully generated with model: ${modelName}`);
+        return result;
+      } catch (error) {
+        lastError = error;
+        console.error(
+          `[Content] Model ${modelName} with API key ${keyIndex + 1} failed: ${error.message}`,
+        );
+      }
     }
   }
 
