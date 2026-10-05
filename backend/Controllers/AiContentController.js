@@ -170,18 +170,18 @@ const apiKeyFallback = process.env.NODE_GEMINI_API_KEY;
 const fallbackModelName = process.env.GEMINI_FALLBACK_MODEL;
 
 const CONTENT_MODEL_FALLBACKS = [
-  configuredModel || "gemini-3.8-flash",
-  "gemini-3.8-flash",
-  fallbackModelName,
+  configuredModel || "gemini-2.0-flash",
+  "gemini-2.0-flash",
+  fallbackModelName || "gemini-1.5-flash",
 ].filter((model, index, models) =>
-  model && model !== "gemini-2.0-flash" && models.indexOf(model) === index,
+  model && models.indexOf(model) === index,
 );
 
 const contentGenerationConfig = {
   responseMimeType: "application/json",
   responseSchema: CHAPTER_CONTENT_SCHEMA,
   temperature: 0.6,
-  maxOutputTokens: 1800,
+  maxOutputTokens: 4096,
 };
 
 const contentSafetySettings = [

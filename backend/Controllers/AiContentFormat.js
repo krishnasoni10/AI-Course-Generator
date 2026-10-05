@@ -48,18 +48,18 @@ const COURSE_LAYOUT_SCHEMA = {
 const fallbackModel = process.env.GEMINI_FALLBACK_MODEL;
 
 const MODEL_FALLBACKS = [
-  configuredModel,
-  "gemini-3.8-flash",
-  fallbackModel,
+  configuredModel || "gemini-2.0-flash",
+  "gemini-2.0-flash",
+  fallbackModel || "gemini-1.5-flash",
 ].filter((model, index, models) =>
-  model && model !== "gemini-2.0-flash" && models.indexOf(model) === index,
+  model && models.indexOf(model) === index,
 );
 
 const generationConfig = {
   responseMimeType: "application/json",
   responseSchema: COURSE_LAYOUT_SCHEMA,
   temperature: 0.55,
-  maxOutputTokens: 1600,
+  maxOutputTokens: 2048,
 };
 
 const safetySettings = [
