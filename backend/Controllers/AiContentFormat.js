@@ -47,12 +47,21 @@ const COURSE_LAYOUT_SCHEMA = {
 
 const fallbackModel = process.env.GEMINI_FALLBACK_MODEL;
 
+const DISALLOWED_MODELS = new Set([
+  "gemini-1.5-flash",
+  "gemini-1.5-pro",
+  "gemini-2.0-flash",
+  "gemini-2.0-flash-exp",
+  "gemini-2.5-flash",
+]);
+
 const MODEL_FALLBACKS = [
-  configuredModel || "gemini-flash-latest",
+  configuredModel,
   "gemini-flash-latest",
-  fallbackModel || "gemini-flash-lite-latest",
+  fallbackModel,
+  "gemini-flash-lite-latest",
 ].filter((model, index, models) =>
-  model && models.indexOf(model) === index,
+  model && !DISALLOWED_MODELS.has(model) && models.indexOf(model) === index,
 );
 
 const generationConfig = {
