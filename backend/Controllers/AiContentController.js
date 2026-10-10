@@ -170,9 +170,9 @@ const apiKeyFallback = process.env.NODE_GEMINI_API_KEY;
 const fallbackModelName = process.env.GEMINI_FALLBACK_MODEL;
 
 const CONTENT_MODEL_FALLBACKS = [
-  configuredModel || "gemini-2.0-flash",
-  "gemini-2.0-flash",
-  fallbackModelName || "gemini-1.5-flash",
+  configuredModel || "gemini-flash-latest",
+  "gemini-flash-latest",
+  fallbackModelName || "gemini-flash-lite-latest",
 ].filter((model, index, models) =>
   model && models.indexOf(model) === index,
 );
