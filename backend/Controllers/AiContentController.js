@@ -197,6 +197,8 @@ const DISALLOWED_MODELS = new Set([
 
 const CONTENT_MODEL_FALLBACKS = [
   configuredModel,
+  "gemini-3.8-flash",
+  "gemini-3.6-flash",
   "gemini-flash-lite-latest",
   "gemini-flash-latest",
   fallbackModelName,
@@ -207,7 +209,6 @@ const CONTENT_MODEL_FALLBACKS = [
 const contentGenerationConfig = {
   responseMimeType: "application/json",
   responseSchema: CHAPTER_CONTENT_SCHEMA,
-  temperature: 0.4,
   maxOutputTokens: 3000,
 };
 
