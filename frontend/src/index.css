@@ -1,41 +1,53 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @custom-variant dark (&:is(.dark *));
-/* Shared visual language */
-html {
-  scroll-behavior: smooth;
+/* styles.css */
+
+
+@keyframes robotFloat {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
 }
 
-body {
-  font-family: Inter, "Segoe UI", Arial, sans-serif;
-  font-feature-settings: "ss01" on;
-  -webkit-font-smoothing: antialiased;
+.animate-robot-float {
+  animation: robotFloat 4s ease-in-out infinite;
+}
+@keyframes homeReveal {
+  0% {
+    opacity: 0;
+    transform: scale(1.03);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
-::selection {
-  color: #fff;
-  background: #635bff;
+.animate-homeReveal {
+  animation: homeReveal 1.4s ease-out forwards;
 }
-
-[class*="rounded-3xl"] { border-radius: 12px !important; }
-[class*="rounded-2xl"] { border-radius: 10px !important; }
-[class*="rounded-xl"] { border-radius: 8px !important; }
 
 .neon-panel {
-  border-color: #e5e7eb;
-  box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.12),
+    0 20px 80px rgba(15, 23, 42, 0.08);
 }
 
-.neon-text { color: #5145e5; }
-
 .dark .neon-panel {
-  border-color: rgb(255 255 255 / 12%);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 18%);
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.16),
+    0 0 42px rgba(34, 211, 238, 0.12),
+    0 0 82px rgba(168, 85, 247, 0.08);
+}
+
+.neon-text {
+  color: #0891b2;
 }
 
 .dark .neon-text {
-  color: #a5a0ff;
-  text-shadow: none;
+  color: #67e8f9;
+  text-shadow: 0 0 26px rgba(34, 211, 238, 0.45);
 }
 
 
@@ -78,14 +90,14 @@ body {
 }
 
 :root {
-  --radius: 0.5rem;
+  --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.55 0.24 278);
+  --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
