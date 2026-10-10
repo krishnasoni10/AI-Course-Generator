@@ -209,6 +209,7 @@ const CONTENT_MODEL_FALLBACKS = [
 const contentGenerationConfig = {
   responseMimeType: "application/json",
   responseSchema: CHAPTER_CONTENT_SCHEMA,
+  thinkingConfig: { thinkingLevel: "low" },
   maxOutputTokens: 3000,
 };
 
@@ -324,8 +325,24 @@ async function generateContentWithFallback(prompt) {
         );
 
         const result = await generateWithRetry(genAIInstance, modelName, prompt, 3);
-        console.log(`[Content] Successfully generated with model: ${modelName}`);
-        return result;
+        const responseText = result.text || "";
+        let parsed;
+        try {
+          parsed = JSON.parse(responseText);
+        } catch {
+          const finishReason = result.candidates?.[0]?.finishReason || "unknown";
+          throw new Error(
+            `Invalid structured JSON from ${modelName} (finishReason: ${finishReason}, responseLength: ${responseText.length}).`,
+          );
+        }
+
+        const content = normalizeChapterContent(parsed);
+        if (content.length === 0) {
+          throw new Error(`Model ${modelName} returned no usable chapter sections.`);
+        }
+
+        console.log(`[Content] Successfully generated and validated with model: ${modelName}`);
+        return content;
       } catch (error) {
         lastError = error;
         console.error(
@@ -364,23 +381,11 @@ async function generateChapterContent(req, res) {
       });
     }
 
-    const result = await generateContentWithFallback(message);
-    const aiResponseText = result.text;
-
-    let parsed;
-    try {
-      parsed = JSON.parse(aiResponseText);
-    } catch (e) {
-      console.error("Invalid JSON from AI:", aiResponseText);
-      return res.status(502).json({
-        success: false,
-        message: "AI returned invalid structured data. Please retry.",
-      });
-    }
+    const generatedContent = await generateContentWithFallback(message);
 
     return res.status(200).json({
       success: true,
-      data: normalizeChapterContent(parsed),
+      data: generatedContent,
     });
 
   } catch (error) {
