@@ -339,7 +339,9 @@ router.post("/save-chapter-content", async (req, res) => {
       textContent !== null &&
       !Array.isArray(textContent)
     ) {
-      if (textContent.chapterDetails) {
+      if (textContent.sections) {
+        contentArray = textContent.sections;
+      } else if (textContent.chapterDetails) {
         contentArray = textContent.chapterDetails;
       } else if (textContent.content_blocks) {
         contentArray = textContent.content_blocks;

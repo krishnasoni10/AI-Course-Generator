@@ -83,8 +83,7 @@ Rules:
 - Each quiz must have exactly 4 short options.
 - The answer must exactly match one option string.
 - Explanation must be 1 short sentence.
-- Do not write paragraph-style quiz questions.
-- Never use placeholders, repeated symbols, filler tokens, _QQ_MARK, or #_# patterns.
+- Return complete, well-formed content without placeholders or filler text.
 - If unsure, return a shorter valid quiz instead of long text.
 `;
 
@@ -191,8 +190,8 @@ Rules:
         await sleep(300);
     };
 
-    for (let i = 0; i < pendingChapters.length; i += 3) {
-      await Promise.all(pendingChapters.slice(i, i + 3).map(runChapter));
+    for (let i = 0; i < pendingChapters.length; i += 2) {
+      await Promise.all(pendingChapters.slice(i, i + 2).map(runChapter));
     }
 
     await fetchCourse();

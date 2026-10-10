@@ -57,9 +57,9 @@ const DISALLOWED_MODELS = new Set([
 
 const MODEL_FALLBACKS = [
   configuredModel,
+  "gemini-flash-lite-latest",
   "gemini-flash-latest",
   fallbackModel,
-  "gemini-flash-lite-latest",
 ].filter((model, index, models) =>
   model && !DISALLOWED_MODELS.has(model) && models.indexOf(model) === index,
 );

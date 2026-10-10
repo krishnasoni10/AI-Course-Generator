@@ -72,10 +72,21 @@ const normalizeQuiz = (value) => {
 };
 
 const normalizeChapterContent = (value) => {
-  if (!Array.isArray(value)) return [];
+  let list = [];
+  if (Array.isArray(value)) {
+    list = value;
+  } else if (value && typeof value === "object") {
+    list =
+      value.sections ||
+      value.chapterDetails ||
+      value.content_blocks ||
+      value.chapter_details ||
+      [];
+  }
+  if (!Array.isArray(list)) return [];
 
   let quizCount = 0;
-  return value.slice(0, 4).map((block, index) => {
+  return list.slice(0, 4).map((block, index) => {
     const remainingQuizSlots = Math.max(0, 3 - quizCount);
     const quiz = normalizeQuiz(block.quiz || block.mcqs || block.MCQs).slice(
       0,
@@ -116,54 +127,61 @@ const normalizeChapterContent = (value) => {
 };
 
 const CHAPTER_CONTENT_SCHEMA = {
-  type: Type.ARRAY,
-  items: {
-    type: Type.OBJECT,
-    properties: {
-      title: { type: Type.STRING },
-      description: { type: Type.STRING },
+  type: Type.OBJECT,
+  properties: {
+    sections: {
+      type: Type.ARRAY,
+      description: "List of 2 to 3 lesson sections for this chapter.",
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING },
+          description: { type: Type.STRING },
 
-      codeExample: {
-        type: Type.STRING,
-        description:
-          "Optional code snippet. Must be formatted as a string containing HTML <pre><code>...</code></pre> tags. Can be an empty string if not applicable.",
-      },
-      objectives: {
-        type: Type.ARRAY,
-        items: { type: Type.STRING },
-      },
-      keyTopics: {
-        type: Type.ARRAY,
-        items: { type: Type.STRING },
-      },
-      readings: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            title: { type: Type.STRING },
-            url: { type: Type.STRING },
+          codeExample: {
+            type: Type.STRING,
+            description:
+              "Optional code snippet. Must be formatted as a string containing HTML <pre><code>...</code></pre> tags. Can be an empty string if not applicable.",
           },
-        },
-      },
-      quiz: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            question: { type: Type.STRING },
-            options: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING },
+          objectives: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+          },
+          keyTopics: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+          },
+          readings: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING },
+                url: { type: Type.STRING },
+              },
             },
-            answer: { type: Type.STRING },
-            explanation: { type: Type.STRING },
+          },
+          quiz: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                question: { type: Type.STRING },
+                options: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING },
+                },
+                answer: { type: Type.STRING },
+                explanation: { type: Type.STRING },
+              },
+            },
           },
         },
+        required: ["title", "description"],
       },
     },
-    required: ["title", "description"],
   },
+  required: ["sections"],
 };
 
 const apiKeyFallback = process.env.NODE_GEMINI_API_KEY;
@@ -179,9 +197,9 @@ const DISALLOWED_MODELS = new Set([
 
 const CONTENT_MODEL_FALLBACKS = [
   configuredModel,
+  "gemini-flash-lite-latest",
   "gemini-flash-latest",
   fallbackModelName,
-  "gemini-flash-lite-latest",
 ].filter((model, index, models) =>
   model && !DISALLOWED_MODELS.has(model) && models.indexOf(model) === index,
 );
@@ -189,8 +207,8 @@ const CONTENT_MODEL_FALLBACKS = [
 const contentGenerationConfig = {
   responseMimeType: "application/json",
   responseSchema: CHAPTER_CONTENT_SCHEMA,
-  temperature: 0.6,
-  maxOutputTokens: 4096,
+  temperature: 0.4,
+  maxOutputTokens: 3000,
 };
 
 const contentSafetySettings = [
